@@ -834,6 +834,9 @@
         let selectedQuantumNum = 27;
         let currentMarkData = [];
         let weeksData = [];
+        let lastSeenDate = {};
+        let lastSeenTime = {};
+        let frequency = {};
         
         // ========== INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', async function() {
@@ -1002,9 +1005,17 @@
             const timeOrder = ["MOR", "MID", "NON", "EVE"];
             const timeNames = { MOR: "Morning", MID: "Midday", NON: "Afternoon", EVE: "Evening" };
             
-            // Generate 12 weeks of data
+            // Reset data structures
+            timeline = [];
+            markInfo = {};
+            currentWeekHits = {};
+            frequency = {};
+            lastSeenDate = {};
+            lastSeenTime = {};
+            
+            // Generate 159 weeks of data (matching your second code)
             weeksData = [];
-            for (let w = 11; w >= 0; w--) {
+            for (let w = 158; w >= 0; w--) {
                 const weekStart = new Date(now.getTime() - (w * 7 * 86400000));
                 const isCurrentWeek = (w === 0);
                 
@@ -1023,46 +1034,65 @@
                     
                     // Generate draws for each time slot
                     for (let t = 0; t < 4; t++) {
-                        const drawNum = Math.floor(Math.random() * 36) + 1;
-                        day.draws[timeOrder[t]] = drawNum;
+                        // Make draws more realistic - some numbers appear more often
+                        let drawNum;
+                        if (Math.random() > 0.7) {
+                            // 30% chance for "hot" numbers (1-12)
+                            drawNum = Math.floor(Math.random() * 12) + 1;
+                        } else {
+                            drawNum = Math.floor(Math.random() * 36) + 1;
+                        }
                         
-                        // Track in timeline
-                        timeline.push({
-                            num: drawNum,
-                            date: dayDate.getTime(),
-                            dateStr: dayDate.toLocaleDateString("en-GB", {weekday:"short", day:"2-digit", month:"short", year:"numeric"}).toUpperCase(),
-                            dayName: dayOrder[d],
-                            timeSlot: timeOrder[t],
-                            time: timeNames[timeOrder[t]]
-                        });
-                        
-                        // Update mark info
-                        if (!markInfo[drawNum]) {
-                            markInfo[drawNum] = {
-                                frequency: 0,
-                                lastDate: null,
-                                history: [],
-                                nextNums: {}
+                        // Sometimes skip draws
+                        if (Math.random() > 0.1) {
+                            day.draws[timeOrder[t]] = drawNum;
+                            
+                            // Track frequency and last seen EXACTLY as in second code
+                            frequency[drawNum] = (frequency[drawNum] || 0) + 1;
+                            lastSeenDate[drawNum] = dayDate;
+                            lastSeenTime[drawNum] = timeNames[timeOrder[t]];
+                            
+                            // Track current week hits for widget
+                            if (isCurrentWeek) {
+                                currentWeekHits[drawNum] = (currentWeekHits[drawNum] || 0) + 1;
+                            }
+                            
+                            // Track in timeline
+                            const entry = { 
+                                num: drawNum, 
+                                date: dayDate.getTime(), 
+                                dateStr: dayDate.toLocaleDateString("en-GB", {weekday:"short", day:"2-digit", month:"short", year:"numeric"}).toUpperCase(), 
+                                dayName: dayOrder[d], 
+                                timeSlot: timeOrder[t], 
+                                time: timeNames[timeOrder[t]] 
                             };
-                        }
-                        
-                        markInfo[drawNum].frequency++;
-                        markInfo[drawNum].lastDate = dayDate;
-                        markInfo[drawNum].history.push({
-                            date: dayDate.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric"}).toUpperCase(),
-                            time: timeNames[timeOrder[t]],
-                            ts: dayDate.getTime()
-                        });
-                        
-                        // Track current week hits
-                        if (isCurrentWeek) {
-                            currentWeekHits[drawNum] = (currentWeekHits[drawNum] || 0) + 1;
-                        }
-                        
-                        // Track next numbers (for follows)
-                        if (timeline.length > 1) {
-                            const prev = timeline[timeline.length - 2];
-                            markInfo[prev.num].nextNums[drawNum] = (markInfo[prev.num].nextNums[drawNum] || 0) + 1;
+                            timeline.push(entry);
+                            
+                            // Initialize markInfo if needed
+                            if (!(drawNum in markInfo)) { 
+                                markInfo[drawNum] = { 
+                                    frequency: 0, 
+                                    lastDate: null, 
+                                    history: [], 
+                                    nextNums: {} 
+                                }; 
+                            }
+                            
+                            markInfo[drawNum].frequency++;
+                            markInfo[drawNum].lastDate = dayDate;
+                            markInfo[drawNum].history.push({ 
+                                date: entry.dateStr, 
+                                time: entry.time, 
+                                ts: entry.date 
+                            });
+                            
+                            // Track next numbers EXACTLY as in second code
+                            if (timeline.length > 1) {
+                                let prev = timeline[timeline.length - 2];
+                                if (markInfo[prev.num]) {
+                                    markInfo[prev.num].nextNums[drawNum] = (markInfo[prev.num].nextNums[drawNum] || 0) + 1;
+                                }
+                            }
                         }
                     }
                     
@@ -1072,38 +1102,48 @@
                 weeksData.push(week);
             }
             
-            // Generate current mark data
+            // Sort weeks chronologically EXACTLY as in second code
+            weeksData.sort((a, b) => {
+                let pa = a.startDate.split(" ");
+                let pb = b.startDate.split(" ");
+                return new Date(`${pa[2]}-${pa[1]}-${pa[0]}`) - new Date(`${pb[2]}-${pb[1]}-${pb[0]}`);
+            });
+            
+            // Generate marks data EXACTLY as in second code
             currentMarkData = [];
+            const nowTime = new Date();
+            
             for (let n = 1; n <= 36; n++) {
-                const info = markInfo[n] || { frequency: 0, lastDate: null };
-                const daysAgo = info.lastDate ? Math.floor((now.getTime() - info.lastDate.getTime()) / 86400000) : 999;
-                const avg = intervals[n] || 12;
-                const dLeft = avg - daysAgo;
-                const status = (dLeft <= 0) ? "OVERDUE" : (dLeft <= 2 ? "CLOSE" : "NORMAL");
+                let info = markInfo[n] || { frequency: 0, lastDate: null };
+                let daysAgo = info.lastDate ? Math.floor((nowTime.getTime() - info.lastDate.getTime()) / 86400000) : 999;
+                let avg = intervals[n] || 12;
+                let dLeft = avg - daysAgo;
+                let status = (dLeft <= 0) ? "OVERDUE" : (dLeft <= 2 ? "CLOSE" : "NORMAL");
                 
-                currentMarkData.push({
-                    num: n,
-                    spirit: spirits[n],
-                    date: info.lastDate ? info.lastDate.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric"}).toUpperCase() : "N/A",
-                    days: daysAgo,
-                    dLeft: dLeft,
-                    status: status,
-                    avg: avg,
+                currentMarkData.push({ 
+                    num: n, 
+                    spirit: spirits[n], 
+                    date: info.lastDate ? info.lastDate.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric"}).toUpperCase() : "N/A", 
+                    days: daysAgo, 
+                    dLeft: dLeft, 
+                    status: status, 
+                    avg: avg, 
                     frequency: info.frequency,
-                    time: markInfo[n] && markInfo[n].history.length > 0 ? markInfo[n].history[0].time : "N/A",
+                    time: lastSeenTime[n] || "N/A",
                     isHitThisWeek: !!currentWeekHits[n]
                 });
             }
             
-            currentMarkData.sort((a, b) => b.days - a.days);
+            // Sort by days ago (most recent first) EXACTLY as in second code
+            currentMarkData.sort((a,b) => b.days - a.days);
             
-            // Generate outstanding buckets EXACTLY like second code
+            // Generate outstanding buckets EXACTLY as in second code
             generateOutstandingBuckets();
         }
         
         function generateOutstandingBuckets() {
-            // Exactly as in second code: Prepare weeks for outstanding (recent first)
-            let weeksForOutstanding = weeksData.slice().reverse();
+            // EXACTLY as in second code
+            let weeksForOutstanding = weeksData.slice().reverse(); // Recent first
             outstandingBuckets = { "THIS": [] };
             for (let i = 0; i < 12; i++) outstandingBuckets[i] = [];
             
@@ -1134,7 +1174,7 @@
                 }
                 
                 if (!found) {
-                    // If not found in last 12 weeks, put in oldest bucket
+                    // If not found in last 12 weeks, mark as very old
                     outstandingBuckets[11].push(n);
                 }
             }
