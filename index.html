@@ -590,6 +590,29 @@
         #main-content.show {
             display: block;
         }
+
+        /* Offline indicator */
+        .offline-indicator {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff453a;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 9998;
+            animation: pulse 2s infinite;
+            box-shadow: 0 2px 10px rgba(255, 69, 58, 0.3);
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
     </style>
 </head>
 <body>
@@ -786,6 +809,44 @@
             // Setup ticker
             setupTicker();
         });
+
+        // ========== NOTIFICATION SYSTEM ==========
+        function showNotification(message, type = 'info') {
+            // Remove any existing notifications first
+            const existing = document.querySelectorAll('.notification-toast');
+            existing.forEach(n => n.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = 'notification-toast';
+            notification.innerHTML = `
+                <div style="position:fixed; top:20px; right:20px; background:${type === 'error' ? '#ff453a' : type === 'warning' ? '#ff9f0a' : '#32d74b'}; color:white; padding:12px 20px; border-radius:8px; z-index:9999; font-weight:bold; box-shadow:0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out;">
+                    ${message}
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Add CSS animation
+            if (!document.getElementById('notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
         
         // ========== QUANTUM CHART FUNCTIONS (From first code) ==========
         function initializeQuantumChart() {
@@ -867,26 +928,123 @@
         // ========== DATA LOADING ==========
         async function loadData() {
             try {
-                // These are your actual API endpoints
                 const PLAY_WHE_URL = "https://script.google.com/macros/s/AKfycbwyr-M_ZzIscNgxJmR_UYHgZqmamn62Np4msDFaCjX9KgyUmyjuzuIYbawBmT0_mw4j/exec?action=calendar&game=P2WHE&weeks=159";
-                const TICKER_URL = "https://script.google.com/macros/s/AKfycbymSUZ3cuBP7wZSKkxs8QmjMkKP6q3j-LOW_CVpY3n6Sw1EzsdwPu6yTEkpOmiAJz95/exec?action=ticker";
                 
-                // Load main data
-                const response = await fetch(PLAY_WHE_URL);
-                const json = await response.json();
+                // Check if we have cached data and it's less than 1 hour old
+                const cachedData = localStorage.getItem('playwhe_data');
+                const lastUpdated = localStorage.getItem('playwhe_last_updated');
+                const oneHourAgo = Date.now() - (60 * 60 * 1000);
                 
-                // Process data EXACTLY as in your second code
-                processData(json.data.weeks);
-                
-                // Render all tabs
-                renderShelfTab();
-                renderDrawsTab();
-                renderOutstandingTable();
+                if (navigator.onLine) {
+                    // Try to fetch fresh data
+                    showNotification('🔄 Fetching latest data...', 'info');
+                    
+                    const response = await fetch(PLAY_WHE_URL);
+                    const json = await response.json();
+                    
+                    // Cache the data
+                    localStorage.setItem('playwhe_data', JSON.stringify(json.data.weeks));
+                    localStorage.setItem('playwhe_last_updated', Date.now());
+                    
+                    // Process and render
+                    processData(json.data.weeks);
+                    renderShelfTab();
+                    renderDrawsTab();
+                    renderOutstandingTable();
+                    updateTimeDisplay();
+                    
+                    showNotification('✅ Data updated successfully!', 'success');
+                    
+                    // Set auto-refresh (every 5 minutes)
+                    if (window.autoRefreshInterval) {
+                        clearInterval(window.autoRefreshInterval);
+                    }
+                    window.autoRefreshInterval = setInterval(async () => {
+                        console.log('Auto-refreshing data...');
+                        await loadData();
+                    }, 5 * 60 * 1000);
+                    
+                } else if (cachedData && lastUpdated && parseInt(lastUpdated) > oneHourAgo) {
+                    // Use cached data if offline and cache is fresh
+                    showNotification('📡 Offline - Using cached data', 'warning');
+                    const json = JSON.parse(cachedData);
+                    processData(json);
+                    renderShelfTab();
+                    renderDrawsTab();
+                    renderOutstandingTable();
+                    updateTimeDisplay();
+                    
+                } else {
+                    // No cache or cache is old
+                    if (cachedData) {
+                        showNotification('📡 Using outdated cache - connect for fresh data', 'warning');
+                        const json = JSON.parse(cachedData);
+                        processData(json);
+                    } else {
+                        showNotification('❌ No internet connection and no cached data', 'error');
+                        loadSampleData();
+                    }
+                    renderShelfTab();
+                    renderDrawsTab();
+                    renderOutstandingTable();
+                    updateTimeDisplay();
+                }
                 
             } catch (error) {
                 console.error('Error loading data:', error);
-                // Fallback to sample data if API fails
-                loadSampleData();
+                
+                // Try to use cache as fallback
+                const cachedData = localStorage.getItem('playwhe_data');
+                if (cachedData) {
+                    showNotification('⚠️ Using cached data (network error)', 'warning');
+                    const json = JSON.parse(cachedData);
+                    processData(json);
+                } else {
+                    showNotification('❌ Network error - loading sample data', 'error');
+                    loadSampleData();
+                }
+                
+                renderShelfTab();
+                renderDrawsTab();
+                renderOutstandingTable();
+                updateTimeDisplay();
+            }
+        }
+
+        // ========== UPDATE TIME DISPLAY ==========
+        function updateTimeDisplay() {
+            const now = new Date();
+            const timeStr = `Last updated: ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            
+            // Create or update the time display
+            let timeDisplay = document.getElementById('last-update-display');
+            
+            if (!timeDisplay) {
+                timeDisplay = document.createElement('div');
+                timeDisplay.id = 'last-update-display';
+                timeDisplay.style.cssText = 'text-align:center; color:#8e8e93; font-size:12px; margin:15px 0; font-weight:500;';
+                
+                // Add to the bottom of the shelf tab (you can change this location)
+                const shelfTab = document.getElementById('shelf-tab');
+                if (shelfTab) {
+                    shelfTab.appendChild(timeDisplay);
+                } else {
+                    // Fallback to body
+                    document.body.appendChild(timeDisplay);
+                }
+            }
+            
+            timeDisplay.textContent = timeStr;
+            
+            // Also show how long ago
+            const lastUpdated = localStorage.getItem('playwhe_last_updated');
+            if (lastUpdated) {
+                const minutesAgo = Math.floor((Date.now() - parseInt(lastUpdated)) / 60000);
+                if (minutesAgo > 0) {
+                    timeDisplay.innerHTML += ` <span style="color:${minutesAgo > 30 ? '#ff453a' : '#32d74b'};">(${minutesAgo}m ago)</span>`;
+                } else {
+                    timeDisplay.innerHTML += ' <span style="color:#32d74b;">(Just now)</span>';
+                }
             }
         }
         
@@ -1153,6 +1311,36 @@
                 }).join('')}
             `;
         }
+
+        // ========== OFFLINE DETECTION ==========
+        function updateOnlineStatus() {
+            if (!navigator.onLine) {
+                showNotification('📡 You are offline - using cached data', 'warning');
+                
+                // Create offline indicator
+                let indicator = document.getElementById('offline-indicator');
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'offline-indicator';
+                    indicator.className = 'offline-indicator';
+                    indicator.textContent = '📡 OFFLINE MODE';
+                    document.body.appendChild(indicator);
+                }
+            } else {
+                // Remove offline indicator
+                const indicator = document.getElementById('offline-indicator');
+                if (indicator) {
+                    indicator.remove();
+                }
+            }
+        }
+        
+        // Listen for online/offline events
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        // Initial check
+        updateOnlineStatus();
         
         // ========== TICKER FUNCTIONS ==========
         function setupTicker() {
