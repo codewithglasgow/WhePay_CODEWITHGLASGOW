@@ -32,15 +32,15 @@
         
         /* NEW Ticker Styles */
         .ticker-fixed { 
-            background: linear-gradient(to bottom, #202020, #1f0000); 
+            background: linear-gradient(to bottom, #222222, #020000); 
             border-bottom: 1px solid #313131; 
-            padding: 0px 7px; 
+            padding: 0px 4px; 
             position: sticky; 
             top: 0; 
             z-index: 1000; 
             width: 100%; 
             box-shadow: 0 4px 10px rgba(6, 1, 14, 0.6);
-            height: 85px;
+            height: 65px;
             display: flex;
             align-items: center;
             overflow: hidden;
@@ -111,7 +111,7 @@
         }
 
         .ticker-time { 
-            color: #ffa500; 
+            color: #f5f5f8; 
             font-weight: bold; 
             min-width: 110px; 
             text-align: right; 
@@ -134,7 +134,7 @@
         /* Original styles */
         .nav { 
             position: sticky; 
-            top: 75px; 
+            top: 58px; 
             width: 100%; 
             background: rgba(4, 0, 17, 0.9); 
             backdrop-filter: blur(20px); 
@@ -156,8 +156,8 @@
         
         .tabs { 
             display: flex; 
-            gap: 6px; 
-            margin-bottom: 10px; 
+            gap: 3px; 
+            margin-bottom: 6px; 
         }
         
         .tab { 
@@ -165,7 +165,7 @@
             background: #2c2c2e; 
             border: none; 
             color: #fff; 
-            padding: 12px; 
+            padding: 6px; 
             border-radius: 10px; 
             font-weight: 800; 
             font-size: 14px; 
@@ -1000,17 +1000,18 @@
                 <div id="calendar-dropdown" class="outstanding-panel" style="display: none;">
                     <div class="calendar-dropdown-header">
                         <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                            <button class="week-nav-btn-small" onclick="navigateWeek(1)">◀ Older Week</button>
-                            <button class="week-nav-btn-small" onclick="navigateWeek(-1)">Newer Week ▶</button>
+                            
                         </div>
                         <h3 id="current-week-title" class="calendar-dropdown-title" style="margin: 10px 0;">LOADING...</h3>
-                        <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;">
+                        <div style="display: flex; gap: 2px; flex-wrap: wrap; justify-content: center;">
+                            <button class="week-nav-btn-small" onclick="navigateWeek(1)">◀</button>
                             <button class="week-nav-btn-small" onclick="navigateToDayOfWeek('Monday')">MON</button>
                             <button class="week-nav-btn-small" onclick="navigateToDayOfWeek('Tuesday')">TUE</button>
                             <button class="week-nav-btn-small" onclick="navigateToDayOfWeek('Wednesday')">WED</button>
                             <button class="week-nav-btn-small" onclick="navigateToDayOfWeek('Thursday')">THU</button>
                             <button class="week-nav-btn-small" onclick="navigateToDayOfWeek('Friday')">FRI</button>
                             <button class="week-nav-btn-small" onclick="navigateToDayOfWeek('Saturday')">SAT</button>
+                            <button class="week-nav-btn-small" onclick="navigateWeek(-1)">▶</button>
                         </div>
                     </div>
                     <div id="calendar-content" class="calendar-dropdown-container">
@@ -1393,7 +1394,7 @@
                     renderDrawsTab();
                     renderOutstandingTable();
                     updateTimeDisplay();
-                    
+
                     showNotification('✅ Data updated successfully!', 'success');
                     
                     // Set auto-refresh (every 5 minutes)
@@ -1487,7 +1488,7 @@
                 if (minutesAgo > 0) {
                     timeDisplay.innerHTML += ` <span style="color:${minutesAgo > 30 ? '#ff453a' : '#32d74b'};">(${minutesAgo}m ago)</span>`;
                 } else {
-                    timeDisplay.innerHTML += ' <span style="color:#32d74b;">(Just now)</span>';
+                    timeDisplay.innerHTML += ' <span style="color:#32d74b;">(Just now | 🔄 5 min)</span>';
                 }
             }
         }
@@ -1521,6 +1522,9 @@
                         
                         // Render initial calendar
                         renderCalendarWidgetStyle();
+
+                        // Start countdown timers
+                        setTimeout(startCountdownTimers, 100);
                     }
                 } catch (error) {
                     console.error('Error parsing calendar data:', error);
@@ -1529,6 +1533,11 @@
         }
 
         function renderCalendarWidgetStyle() {
+            // Clear any existing countdown timers before rendering new ones
+            if (window.countdownTimers) {
+                window.countdownTimers = [];
+            }
+
             const container = document.getElementById('calendar-content');
             const title = document.getElementById('current-week-title');
             
@@ -1553,17 +1562,34 @@
                     const parts = week.startDate.split(' ');
                     const dateStr = `${parts[0]}-${parts[1].slice(0,3)}`;
                     
+                    // Calculate the actual date of this day
+                    const baseDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    const dayIndex = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].indexOf(dayName);
+                    const actualDate = new Date(baseDate);
+                    actualDate.setDate(baseDate.getDate() + dayIndex);
+                    
+                    // Create date string with correct day of month for this specific weekday
+                    const dayOfMonth = actualDate.getDate();
+                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const monthName = monthNames[actualDate.getMonth()];
+                    const year = actualDate.getFullYear();
+                    
+                    // Use the actual date for display, not the week start date
+                    const displayDateStr = `${dayOfMonth}-${monthName}`;
+                    
                     daysToShow.push({
-                        date: dateStr,
+                        date: displayDateStr,  // Use the calculated date
+                        year: year.toString(),
                         draws: day.draws || {},
                         dayName: day.dayName,
                         weekIndex: i,
                         isCurrentWeek: i === currentWeekIndex,
-                        isPastWeek: i > currentWeekIndex, // Weeks before current are past
-                        weekData: week
+                        isPastWeek: i > currentWeekIndex,
+                        weekData: week,
+                        actualDate: actualDate
                     });
                     
-                    if (daysToShow.length >= 5) break;
+                    if (daysToShow.length >= 6) break;
                 }
             }
             
@@ -1575,19 +1601,33 @@
                     
                     if (day) {
                         const parts = week.startDate.split(' ');
-                        const dateStr = `${parts[0]}-${parts[1].slice(0,3)}`;
+                        
+                        const baseDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                        const dayIndex = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].indexOf(dayName);
+                        const actualDate = new Date(baseDate);
+                        actualDate.setDate(baseDate.getDate() + dayIndex);
+                        
+                        // Create date string with correct day of month
+                        const dayOfMonth = actualDate.getDate();
+                        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        const monthName = monthNames[actualDate.getMonth()];
+                        const year = actualDate.getFullYear();
+                        
+                        const displayDateStr = `${dayOfMonth}-${monthName}`;
                         
                         daysToShow.push({
-                            date: dateStr,
+                            date: displayDateStr,
+                            year: year.toString(),
                             draws: day.draws || {},
                             dayName: day.dayName,
                             weekIndex: i,
                             isCurrentWeek: i === currentWeekIndex,
                             isPastWeek: i > currentWeekIndex,
-                            weekData: week
+                            weekData: week,
+                            actualDate: actualDate
                         });
                         
-                        if (daysToShow.length >= 5) break;
+                        if (daysToShow.length >= 6) break;
                     }
                 }
             }
@@ -1608,11 +1648,14 @@
             
             // Show in REVERSE order (oldest first, current at bottom)
             const reversedDays = [...daysToShow].reverse();
+            const now = new Date();
             
             reversedDays.forEach((day, idx) => {
                 const draws = day.draws || {};
                 const isPastWeek = day.isPastWeek;
                 const isCurrentWeek = day.isCurrentWeek;
+                const isToday = day.actualDate.toDateString() === now.toDateString();
+                const isFutureDay = day.actualDate > now && isCurrentWeek;
                 
                 // Check if it's a holiday (all draws are empty)
                 const isHoliday = !draws || Object.values(draws).every(v => !v || v === "-" || v === "–" || v === "PENDING");
@@ -1621,7 +1664,7 @@
                 const shouldShowHoliday = isHoliday && !isCurrentWeek;
                 
                 html += `<tr${isCurrentWeek ? ' class="current-day-row"' : ''}>`;
-                html += `<td class="date-header">${day.date}<br><small style="color:#666;">${day.dayName.slice(0,3)}</small></td>`;
+                html += `<td class="date-header"><small style="color:#666;">${day.dayName.slice(0,3)}</small><br>${day.date}<br><small style="color:#888; font-size:9px;">${day.year}</small></td>`;
                 
                 if (shouldShowHoliday) {
                     // Past week holiday - show HOLIDAY
@@ -1634,26 +1677,42 @@
                         
                         if (!drawValue || drawValue === "-" || drawValue === "PENDING") {
                             if (isCurrentWeek) {
-                                // Current week pending - show countdown/pending indicator
-                                const now = new Date();
-                                const drawTime = getDrawTime(timeSlot);
-                                const timeDiff = drawTime - now;
-                                
-                                if (timeDiff > 0) {
-                                    // Draw hasn't happened yet today
-                                    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-                                    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                                    
-                                    if (hours > 0) {
-                                        html += `<span style="color:#ffa500; font-size:10px; font-weight:bold;">${hours}h</span>`;
-                                    } else if (minutes > 0) {
-                                        html += `<span style="color:#ff4444; font-size:10px; font-weight:bold;">${minutes}m</span>`;
+                                if (isFutureDay) {
+                                    // Future day in current week - show "FUTURE" or days until
+                                    const daysUntil = Math.ceil((day.actualDate - now) / (1000 * 60 * 60 * 24));
+                                    if (daysUntil === 1) {
+                                        html += `<span style="color:#00ccff; font-size:10px; font-weight:bold;">TOMORROW</span>`;
+                                    } else if (daysUntil === 2) {
+                                        html += `<span style="color:#00ccff; font-size:10px; font-weight:bold;">IN 2 DAYS</span>`;
+                                    } else if (daysUntil === 3) {
+                                        html += `<span style="color:#00ccff; font-size:10px; font-weight:bold;">IN 3 DAYS</span>`;
                                     } else {
-                                        html += `<span style="color:#ff4444; font-size:10px; font-weight:bold;">DUE</span>`;
+                                        html += `<span style="color:#00ccff; font-size:10px; font-weight:bold;">FUTURE</span>`;
                                     }
+                                } else if (isToday) {
+                                    // Today in current week - show countdown/pending indicator
+                                    const drawTime = getDrawTime(timeSlot);
+                                    const timeDiff = drawTime - now;
+                                    
+                                if (timeDiff > 0) {
+                                    // Draw hasn't happened yet today - create a countdown timer
+                                    const countdownId = `countdown-${day.date}-${timeSlot}`;
+                                    html += `DRAW<br><span id="${countdownId}" style="color:#ffa500; font-size:10px; font-weight:bold;">00h:00m:00s</span>`;
+                                    
+                                    // Store countdown data for the timer function
+                                    if (!window.countdownTimers) window.countdownTimers = [];
+                                    window.countdownTimers.push({
+                                        id: countdownId,
+                                        drawTime: drawTime.getTime(),
+                                        timeSlot: timeSlot
+                                    });
                                 } else {
                                     // Draw time has passed but no result yet
-                                    html += '<span class="pending-hourglass">⏳</span>';
+                                    html += 'STANDBY<br><span class="pending-hourglass">⏳</span>';
+                                }
+                                } else {
+                                    // Past day in current week (already happened) with no result
+                                    html += '<span style="color:#666; font-size:11px;">–</span>';
                                 }
                             } else {
                                 // Past week with no draw
@@ -1682,7 +1741,66 @@
                             weekDiff === 1 ? "LAST WEEK" : 
                             `${weekDiff} WEEKS AGO`;
             
-            title.textContent = `${dayName} • ${weekLabel} • ${daysToShow.length} WEEKS SHOWN`;
+            title.textContent = `${weekLabel} (${dayName}) • ${daysToShow.length} WKS`;
+            
+            // Start countdown timers after rendering
+            setTimeout(startCountdownTimers, 100);
+        }
+
+        // Function to update all countdown timers
+        function updateAllCountdowns() {
+            if (!window.countdownTimers || window.countdownTimers.length === 0) return;
+            
+            const now = new Date().getTime();
+            
+            window.countdownTimers.forEach((timer, index) => {
+                const element = document.getElementById(timer.id);
+                if (!element) {
+                    // Remove timer if element doesn't exist
+                    window.countdownTimers.splice(index, 1);
+                    return;
+                }
+                
+                const timeDiff = timer.drawTime - now;
+                
+                if (timeDiff > 0) {
+                    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+                    
+                    if (hours > 0) {
+                        element.textContent = `${hours.toString().padStart(2, '0')}h:${minutes.toString().padStart(2, '0')}m:${seconds.toString().padStart(2, '0')}s`;
+                        element.style.color = '#ffa500';
+                    } else if (minutes > 0) {
+                        element.textContent = `${minutes.toString().padStart(2, '0')}m:${seconds.toString().padStart(2, '0')}s`;
+                        element.style.color = '#ff4444';
+                    } else {
+                        element.textContent = `${seconds.toString().padStart(2, '0')}s`;
+                        element.style.color = '#ff4444';
+                    }
+                } else {
+                    // Countdown expired - update to pending
+                    element.outerHTML = '<span class="pending-hourglass">⏳</span>';
+                    window.countdownTimers.splice(index, 1);
+                }
+            });
+        }
+
+        // Function to start the countdown timer interval
+        function startCountdownTimers() {
+            // Clear any existing interval
+            if (window.countdownInterval) {
+                clearInterval(window.countdownInterval);
+            }
+            
+            // Initialize if not exists
+            if (!window.countdownTimers) {
+                window.countdownTimers = [];
+            }
+            
+            // Update immediately and then every second
+            updateAllCountdowns();
+            window.countdownInterval = setInterval(updateAllCountdowns, 1000);
         }
 
         // Helper function to get draw times
@@ -1924,7 +2042,7 @@
     
     jsNowTs = now.getTime();
     
-    // ========== CALENDAR DATA PROCESSING - SIMPLIFIED (No isToday reference) ==========
+    // ========== CALENDAR DATA PROCESSING ==========
     try {
         if (weeks && weeks.length > 0) {
             calendarWeeks = weeks.map(week => ({
